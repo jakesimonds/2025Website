@@ -21,6 +21,12 @@ export default function Layout({ children }) {
               >
                 Blog
               </Link>
+              <Link
+                to="/services"
+                className="inline-flex items-center px-1 pt-1 text-gray-600 hover:text-blue-600"
+              >
+                Services
+              </Link>
               <a
                 href={socialConfig.calendly.url}
                 target="_blank"
