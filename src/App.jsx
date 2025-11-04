@@ -3,6 +3,8 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import Blog from './pages/Blog'
 import RFID from './pages/RFID'
+import Services from './pages/Services'
+
 
 function App() {
   return (
@@ -12,6 +14,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/RFID" element={<RFID />} />
+          <Route path="/services" element={<Services />} />
+
         </Routes>
       </Layout>
     </Router>
