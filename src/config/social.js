@@ -14,9 +14,9 @@ export const socialConfig = {
     channel: 'jakesimonds5051',
     url: 'https://www.youtube.com/@jakesimonds5051',
   },
-  calendly: {
+  cal: {
     username: 'jakesimonds',
-    url: 'https://calendly.com/jakesimonds',
+    url: 'https://cal.com/jake-simonds',
   },
   bluesky: {
     handle: 'latenthomer.com',

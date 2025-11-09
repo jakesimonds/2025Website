@@ -6,7 +6,7 @@ const socialIcons = {
   github: { Icon: FaGithub, label: 'GitHub', color: 'bg-gray-800 hover:bg-gray-900' },
   linkedin: { Icon: FaLinkedin, label: 'LinkedIn', color: 'bg-blue-600 hover:bg-blue-700' },
   youtube: { Icon: FaYoutube, label: 'YouTube', color: 'bg-red-600 hover:bg-red-700' },
-  calendly: { Icon: FaCalendar, label: 'Calendly', color: 'bg-blue-500 hover:bg-blue-600' },
+  cal: { Icon: FaCalendar, label: 'Cal.com', color: 'bg-blue-500 hover:bg-blue-600' },
   bluesky: { Icon: SiBluesky, label: 'Bluesky', color: 'bg-sky-500 hover:bg-sky-600' },
   mastodon: { Icon: FaMastodon, label: 'Mastodon', color: 'bg-purple-600 hover:bg-purple-700' },
   x: { Icon: FaXTwitter, label: 'X (Twitter)', color: 'bg-black hover:bg-gray-900' },
