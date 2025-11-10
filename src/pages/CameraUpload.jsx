@@ -1,16 +1,106 @@
 import { useState, useRef, useEffect } from 'react'
 
 export default function CameraUpload() {
-  const [view, setView] = useState('info') // info, camera, preview, loading, result
-  const [showInfoModal, setShowInfoModal] = useState(true)
+  const [view, setView] = useState('filterSelect') // filterSelect, camera, preview, loading, result
   const [stream, setStream] = useState(null)
   const [capturedImage, setCapturedImage] = useState(null)
+  const [selectedFilter, setSelectedFilter] = useState('none') // Default to no filter
   const [resultMessage, setResultMessage] = useState('')
   const [postUrl, setPostUrl] = useState('')
   const [error, setError] = useState('')
 
   const videoRef = useRef(null)
+  const cameraVideoRef = useRef(null)
   const canvasRef = useRef(null)
+
+  // Filter definitions - no filter + 3 simple, reliable filters
+  const filters = {
+    none: {
+      name: 'Normal',
+      css: 'none',
+      process: (imageData) => imageData // No processing, return as-is
+    },
+    sepia: {
+      name: 'Vintage',
+      css: 'sepia(1)',
+      process: (imageData) => applySepiaFilter(imageData)
+    },
+    contrast: {
+      name: 'Dramatic',
+      css: 'grayscale(1) contrast(2.5) brightness(0.9)',
+      process: (imageData) => applyContrastFilter(imageData)
+    },
+    invert: {
+      name: 'Inverted',
+      css: 'invert(1)',
+      process: (imageData) => applyInvertFilter(imageData)
+    }
+  }
+
+  // Pixel-level filter functions - simple and reliable
+  const applyGrayscaleFilter = (imageData) => {
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      // Standard grayscale formula
+      const gray = (data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114)
+      data[i] = gray
+      data[i + 1] = gray
+      data[i + 2] = gray
+    }
+    return imageData
+  }
+
+  const applySepiaFilter = (imageData) => {
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+
+      // Standard sepia tone matrix
+      data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189))
+      data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168))
+      data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131))
+    }
+    return imageData
+  }
+
+  const applyContrastFilter = (imageData) => {
+    const data = imageData.data
+    const contrast = 2.5 // Increased from 1.8
+    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast))
+
+    for (let i = 0; i < data.length; i += 4) {
+      // First apply grayscale
+      const gray = (data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114)
+
+      // Then apply high contrast
+      let adjusted = factor * (gray - 128) + 128
+
+      // Slight darkening for drama
+      adjusted = adjusted * 0.9 // Increased darkening from 0.95
+
+      // Clamp values
+      adjusted = Math.max(0, Math.min(255, adjusted))
+
+      data[i] = adjusted
+      data[i + 1] = adjusted
+      data[i + 2] = adjusted
+    }
+    return imageData
+  }
+
+  const applyInvertFilter = (imageData) => {
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      // Invert RGB values (super simple!)
+      data[i] = 255 - data[i]       // Red
+      data[i + 1] = 255 - data[i + 1] // Green
+      data[i + 2] = 255 - data[i + 2] // Blue
+      // Alpha stays the same
+    }
+    return imageData
+  }
 
   // Cleanup camera stream on unmount
   useEffect(() => {
@@ -21,7 +111,12 @@ export default function CameraUpload() {
     }
   }, [stream])
 
-  const startCamera = async () => {
+  // Start camera immediately on mount
+  useEffect(() => {
+    startCameraForPreview()
+  }, [])
+
+  const startCameraForPreview = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -32,8 +127,6 @@ export default function CameraUpload() {
       })
 
       setStream(mediaStream)
-      setView('camera')
-      setShowInfoModal(false)
 
       // Wait for next render, then set stream
       setTimeout(() => {
@@ -46,17 +139,22 @@ export default function CameraUpload() {
     } catch (err) {
       console.error('Camera error:', err)
       setError('Camera access denied. Please enable camera permissions and try again.')
-      alert('Camera access denied. Please enable camera permissions.')
     }
   }
 
+  const selectFilterAndContinue = (filterKey) => {
+    setSelectedFilter(filterKey)
+    setView('camera')
+  }
+
   const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) {
+    const video = cameraVideoRef.current || videoRef.current
+
+    if (!video || !canvasRef.current) {
       console.error('Video or canvas ref not available')
       return
     }
 
-    const video = videoRef.current
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
 
@@ -69,14 +167,20 @@ export default function CameraUpload() {
 
     console.log('Capturing photo with dimensions:', video.videoWidth, 'x', video.videoHeight)
 
-    // Resize to max 1200px width
-    const maxWidth = 1200
-    const scale = maxWidth / video.videoWidth
-    canvas.width = maxWidth
-    canvas.height = video.videoHeight * scale
+    // Make it SQUARE - crop to smallest dimension
+    const size = Math.min(video.videoWidth, video.videoHeight)
+    const maxSize = 1200
+    const finalSize = Math.min(size, maxSize)
 
-    // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.width = finalSize
+    canvas.height = finalSize
+
+    // Center crop the video frame
+    const sx = (video.videoWidth - size) / 2
+    const sy = (video.videoHeight - size) / 2
+
+    // Draw square cropped video frame to canvas
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, finalSize, finalSize)
 
     // Convert canvas to data URL for preview
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8)
@@ -92,7 +196,7 @@ export default function CameraUpload() {
 
   const retakePhoto = async () => {
     setCapturedImage(null)
-    await startCamera()
+    setView('filterSelect')
   }
 
   const uploadPhoto = async () => {
@@ -101,8 +205,35 @@ export default function CameraUpload() {
       return
     }
 
-    // capturedImage is already a data URL
-    const base64Data = capturedImage.split(',')[1]
+    setView('loading')
+
+    // Apply filter to image before uploading using pixel manipulation
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+
+    await new Promise((resolve) => {
+      img.onload = () => {
+        // Draw original image to canvas
+        canvas.width = img.width
+        canvas.height = img.height
+        ctx.drawImage(img, 0, 0)
+
+        // Apply pixel-level filter
+        if (selectedFilter && filters[selectedFilter]) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const filteredData = filters[selectedFilter].process(imageData)
+          ctx.putImageData(filteredData, 0, 0)
+        }
+
+        resolve()
+      }
+      img.src = capturedImage
+    })
+
+    // Get filtered image data
+    const filteredImageDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+    const base64Data = filteredImageDataUrl.split(',')[1]
 
     // Check size
     const sizeInBytes = (base64Data.length * 3) / 4
@@ -110,10 +241,9 @@ export default function CameraUpload() {
 
     if (sizeInMB > 1) {
       alert('Image is too large. Please try again.')
+      setView('preview')
       return
     }
-
-    setView('loading')
 
     try {
       const response = await fetch('https://hdgs7oe2bps2fxp7tqgfjauuuq0jzkpx.lambda-url.us-east-1.on.aws/', {
@@ -151,12 +281,13 @@ export default function CameraUpload() {
   }
 
   const resetApp = () => {
-    setView('info')
-    setShowInfoModal(true)
+    setView('filterSelect')
     setCapturedImage(null)
+    setSelectedFilter('none')
     setResultMessage('')
     setPostUrl('')
     setError('')
+    startCameraForPreview()
   }
 
   return (
@@ -166,31 +297,64 @@ export default function CameraUpload() {
         {/* Hidden canvas for capturing (always rendered) */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-        {/* Info Modal */}
-        {showInfoModal && view === 'info' && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6 text-center">
-            <div className="text-5xl mb-4">📸</div>
-            <p className="text-gray-700 text-lg font-medium mb-6">
-              Photo you take will post to <span className="font-bold text-indigo-600">@elevatorselfie.jakesimonds.com</span> on Bluesky
-            </p>
-            <button
-              onClick={startCamera}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xl font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 active:scale-95"
-            >
-              Take Photo
-            </button>
+        {/* Filter Selection View - Live Camera Grid (No labels) */}
+        {view === 'filterSelect' && (
+          <div className="bg-white rounded-2xl shadow-2xl p-4 text-center">
+            {/* Hidden video element for camera feed */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(filters).map(([key, filter]) => (
+                <button
+                  key={key}
+                  onClick={() => selectFilterAndContinue(key)}
+                  className="relative aspect-square rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200 active:scale-95"
+                >
+                  {/* Live video preview with filter - square crop */}
+                  <div className="relative w-full h-full bg-black overflow-hidden">
+                    <video
+                      ref={(el) => {
+                        if (el && stream) {
+                          el.srcObject = stream
+                          el.play().catch(e => console.log('Video play issue:', e))
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-full w-auto min-w-full object-cover"
+                      style={{ filter: filter.css === 'none' ? '' : filter.css }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Camera View */}
         {view === 'camera' && (
           <div className="bg-white rounded-2xl shadow-2xl p-4 text-center">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full rounded-xl mb-4 bg-black"
-            />
+            <div className="relative w-full aspect-square mb-4 bg-black rounded-xl overflow-hidden">
+              <video
+                ref={(el) => {
+                  cameraVideoRef.current = el
+                  if (el && stream) {
+                    el.srcObject = stream
+                    el.play().catch(e => console.log('Video play issue:', e))
+                  }
+                }}
+                autoPlay
+                playsInline
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full object-cover"
+                style={{ filter: filters[selectedFilter]?.css === 'none' ? '' : filters[selectedFilter]?.css }}
+              />
+            </div>
             <button
               onClick={capturePhoto}
               className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xl font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 active:scale-95"
@@ -203,11 +367,15 @@ export default function CameraUpload() {
         {/* Preview View */}
         {view === 'preview' && (
           <div className="bg-white rounded-2xl shadow-2xl p-4 text-center">
-            <img
-              src={capturedImage}
-              alt="Captured"
-              className="w-full rounded-xl mb-4"
-            />
+            <div className="relative w-full aspect-square mb-4">
+              <img
+                src={capturedImage}
+                alt="Captured"
+                className="w-full h-full object-cover rounded-xl"
+                style={{ filter: filters[selectedFilter]?.css === 'none' ? '' : filters[selectedFilter]?.css }}
+              />
+            </div>
+
             <div className="space-y-3">
               <button
                 onClick={uploadPhoto}
@@ -219,7 +387,7 @@ export default function CameraUpload() {
                 onClick={retakePhoto}
                 className="w-full bg-gray-500 text-white text-lg font-semibold py-3 px-6 rounded-xl shadow hover:bg-gray-600 transition-colors"
               >
-                Retake
+                Choose Different Filter
               </button>
             </div>
           </div>
