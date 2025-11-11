@@ -6,7 +6,6 @@ import RFID from './pages/RFID'
 import Services from './pages/Services'
 import ElevatorSelfie from './pages/ElevatorSelfie'
 import CameraUpload from './pages/CameraUpload'
-import ElevatorSelfieSuccess from './pages/ElevatorSelfieSuccess'
 
 
 function App() {
@@ -24,7 +23,6 @@ function App() {
 
         {/* Standalone routes without Layout/Navigation */}
         <Route path="/qr7f9k2h8d4j6m1p3s5w" element={<CameraUpload />} />
-        <Route path="/elevatorselfie" element={<ElevatorSelfieSuccess />} />
       </Routes>
     </Router>
   )

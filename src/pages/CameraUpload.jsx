@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 // ATProto Facts Configuration - Feel free to edit these!
 const ATPROTO_FACTS = [
@@ -9,7 +8,6 @@ const ATPROTO_FACTS = [
 ]
 
 export default function CameraUpload() {
-  const navigate = useNavigate()
   const [appState, setAppState] = useState('ready') // ready, captured, loading
   const [stream, setStream] = useState(null)
   const [capturedImage, setCapturedImage] = useState(null)
@@ -303,8 +301,14 @@ export default function CameraUpload() {
         setResultMessage('Posted to Bluesky!')
         const postUrl = result.postUrl || ''
         setPostUrl(postUrl)
-        // Redirect to success page
-        navigate('/elevatorselfie', { state: { postUrl } })
+        // Redirect directly to Bluesky post
+        if (postUrl) {
+          window.location.href = postUrl
+        } else {
+          // Fallback if no URL provided
+          setResultMessage('Post successful but no URL provided')
+          setAppState('captured')
+        }
       } else {
         setResultMessage(`Error: ${result.error || 'Upload failed'}`)
         setAppState('captured') // Stay in captured state to allow retry
