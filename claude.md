@@ -135,3 +135,60 @@ For more control over styling:
 3. **Something else?**
 
 Once decided, we can start building! 🚀
+
+---
+
+## AWS Amplify Deployment Instructions
+
+This project is deployed to AWS Amplify as a static site using manual zip upload.
+
+### Building and Deploying
+
+**IMPORTANT:** The zip must contain the build files at the root level, NOT inside a `dist/` folder. If `index.html` is not at the root of the zip, Amplify will show a 404 error.
+
+#### Correct deployment steps:
+
+```bash
+# 1. Build the production bundle
+npm run build
+
+# 2. Navigate into dist and zip its contents (NOT the dist folder itself)
+cd dist && zip -r ../amplify-deploy.zip .
+
+# 3. Verify the zip structure (index.html should be at root)
+unzip -l ../amplify-deploy.zip
+# Should show:
+#   index.html          <- at root level (CORRECT)
+#   home.html
+#   favicon.jpeg
+#   elevatorSelfie.html
+#   assets/
+#   assets/...
+
+# 4. The zip file is now at: /Users/jakesimonds/Documents/CC-website-leaflet/amplify-deploy.zip
+# Drag and drop this into AWS Amplify manual deployment
+```
+
+#### Common mistake to avoid:
+
+```bash
+# ❌ WRONG - This zips the dist folder itself
+zip -r amplify-deploy.zip dist/
+# Results in:
+#   dist/index.html     <- index.html inside dist/ folder (WRONG - causes 404)
+#   dist/home.html
+#   ...
+
+# ✅ CORRECT - This zips the contents of dist
+cd dist && zip -r ../amplify-deploy.zip .
+# Results in:
+#   index.html          <- at root level (CORRECT)
+#   home.html
+#   ...
+```
+
+### Tech Stack
+- **Build tool**: Vite (outputs to `dist/` folder)
+- **Framework**: React + React Router
+- **Styling**: Tailwind CSS
+- **Hosting**: AWS Amplify (manual zip deployment)
