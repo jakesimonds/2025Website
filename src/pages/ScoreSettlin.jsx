@@ -9,8 +9,9 @@ export default function ScoreSettlin() {
   const [error, setError] = useState('')
 
   // Form fields
-  const [claim, setClaim] = useState('')
-  const [walletAddress, setWalletAddress] = useState('0x725c7f7952e372402c49a4cb4468d6115c3340a3')
+  const [claim, setClaim] = useState("dogs don't like to play fetch")
+  const [claimTouched, setClaimTouched] = useState(false)
+  const [walletAddress, setWalletAddress] = useState('jakesimonds.eth')
   const [walletTouched, setWalletTouched] = useState(false)
 
   const videoRef = useRef(null)
@@ -215,9 +216,11 @@ export default function ScoreSettlin() {
     setAppState('ready')
   }
 
-  // Backend config - switch between local dev and prod Lambda
-  const LAMBDA_URL = 'https://tg7nzsvtypbs7t6nkiczaegvvq0neqvc.lambda-url.us-east-1.on.aws'
-  // const LAMBDA_URL = 'http://localhost:3001/bet' // Local dev
+  // Backend config - uses .env.development or .env.production automatically
+  const LAMBDA_URL = import.meta.env.VITE_LAMBDA_URL
+
+  // Bluesky profile where bets get posted
+  const BLUESKY_PROFILE = 'https://bsky.app/profile/babysfirst.pds.jakesimonds.com'
 
   const submitBet = async () => {
     if (!claim.trim()) {
@@ -239,31 +242,21 @@ export default function ScoreSettlin() {
     // Extract base64 data from data URL
     const base64Photo = capturedImage.split(',')[1]
 
-    try {
-      const response = await fetch(LAMBDA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          claim: claim.trim(),
-          walletAddress: walletAddress.trim(),
-          photo: base64Photo,
-        }),
-      })
+    // Fire and forget - trigger Lambda, don't wait for response
+    fetch(LAMBDA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        claim: claim.trim(),
+        walletAddress: walletAddress.trim(),
+        photo: base64Photo,
+      }),
+    }).catch(() => {}) // Ignore errors, we're redirecting anyway
 
-      const result = await response.json()
-
-      if (result.success && result.postUrl) {
-        // Redirect to Bluesky post - user watches the action there
-        window.location.href = result.postUrl
-      } else {
-        setResultMessage(`Error: ${result.error || 'Something went wrong'}`)
-        setAppState('captured')
-      }
-    } catch (err) {
-      console.error('Submit error:', err)
-      setResultMessage(`Failed to connect: ${err.message}`)
-      setAppState('captured')
-    }
+    // Wait 2 seconds then redirect to Bluesky
+    setTimeout(() => {
+      window.location.href = BLUESKY_PROFILE
+    }, 2000)
   }
 
   return (
@@ -331,6 +324,12 @@ export default function ScoreSettlin() {
               <input
                 type="text"
                 value={claim}
+                onFocus={() => {
+                  if (!claimTouched) {
+                    setClaim('')
+                    setClaimTouched(true)
+                  }
+                }}
                 onChange={(e) => setClaim(e.target.value)}
                 placeholder="CLAIM HERE"
                 disabled={appState === 'captured'}
@@ -346,7 +345,7 @@ export default function ScoreSettlin() {
                   }
                 }}
                 onChange={(e) => setWalletAddress(e.target.value)}
-                placeholder="ens/wallet/email(will create wallet)"
+                placeholder="ens or wallet address"
                 disabled={appState === 'captured'}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl text-center text-lg font-semibold placeholder-gray-400 focus:border-green-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-600"
               />
@@ -429,7 +428,7 @@ export default function ScoreSettlin() {
                 {/* Small print / info section */}
                 <div className="mt-4 p-4 bg-gray-50 rounded-xl text-left">
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Your claim will be posted to Bluesky where others can reply T (true) or F (false). If someone replies T, you'll receive 1 JTK token to your wallet. Photos are captured for future verification features.
+                    Your claim will be posted to Bluesky. People will vote T/F on your claim. If you win, you get 1 JakeToken. If you lose, your image is stored in Jake's PDS (Personal Data Server) under lexicon wrong.people.look.like.this
                   </p>
                 </div>
               </div>
